@@ -123,8 +123,7 @@ void parse_args(int argc, const char **argv, Args *args) {
     }
 }
 
-#define new_node(E) (_new_node(E))
-Node* _new_node(NodeKind kind) {
+Node* new_node(NodeKind kind) {
 	Node *n = new(Node);
 	n->kind = kind;
 	return n;
