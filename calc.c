@@ -380,7 +380,7 @@ int main(int argc, const char **argv) {
 	while(true) {
 		printf("> ");
 
-after_prompt:
+		after_prompt:;
 		char buffer[4096];
 		char *input = fgets(buffer, 4096, calc.input);
 		if(!input) {
