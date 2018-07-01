@@ -223,6 +223,17 @@ Node* parse_operand(Calc *calc) {
 
 Node* parse_base(Calc *calc) {
 	Node *expr = parse_operand(calc);
+
+	while(is_token(calc, '(')) {
+		Token op = calc->current_token;
+
+		if(match_token(calc, '(')) {
+
+		} else {
+			assert(!"Invalid case");
+		}
+	}
+
 	return expr;
 }
 
@@ -338,9 +349,6 @@ void print_node(int *i, Node *n) {
 			print_node(i, n->unary.expr);
 			(*i)--;
 		} break;
-		default: {
-			assert(!"Incomplete");
-		} break;
 	}
 }
 
@@ -366,16 +374,33 @@ int main(int argc, const char **argv) {
 		calc.input = stdin;
 	}
 
+	printf("calc v0.01\n");
+	printf("Type 'exit' or 'q' to quit\n\n");
+
 	while(true) {
 		printf("> ");
 
+after_prompt:
 		char buffer[4096];
 		char *input = fgets(buffer, 4096, calc.input);
+		if(!input) {
+			// end of current input, switch to stdin for now
+			calc.input = stdin;
+			goto after_prompt;
+		}
 		
 		calc.input_text = input;
 
-		if(strcmp(input, ".exit\n") == 0) {
+		if(strcmp(input, "exit\n") == 0 || strcmp(input, "q\n") == 0) {
 			break;
+		} else if(strcmp(input, "cls\n") == 0 || strcmp(input, "clear\n") == 0) {
+			#ifdef _WIN32
+				system("cls");
+			#else
+				system("clear");
+			#endif
+
+			continue;
 		}
 
 		next_token(&calc); // advance to first token
