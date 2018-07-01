@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 
 #ifdef _WIN32
 #   define strdup _strdup
@@ -271,7 +272,7 @@ Node* parse_plus(Calc *calc) {
 	while(is_token(calc, '+') || is_token(calc, '-')) {
 		Token op = calc->current_token;
 		next_token(calc);
-		Node *rhs = parse_unary(calc);
+		Node *rhs = parse_mul(calc);
 
 		Node *bin = new_node(NODE_BINARY);
 		bin->binary.op = op.kind;
@@ -323,7 +324,7 @@ void print_node(int *i, Node *n) {
 			indent(i);
 			printf("rhs:\n");
 			(*i)++;
-			print_node(i, n->binary.lhs);
+			print_node(i, n->binary.rhs);
 			(*i)--;
 			(*i)--;
 		} break;
