@@ -601,12 +601,15 @@ int main(int argc, const char **argv) {
 
 		next_token(&calc); // advance to first token
 		Node *n = parse_expr(&calc);
+		//TODO: Assert that the current token is EOF or similar as currently this "1r" parses as "1" and not syntax error.
 		int indent = 0;
 		
 		double result = 0;
 		bool ok = eval_expr(&calc, n, &result);
 		if(ok) {
 			R++;
+
+			//TODO: Add a variable that always refers to the last result
 
 			printf("#%d: %g\n", R, result);
 			char buffer[256];
