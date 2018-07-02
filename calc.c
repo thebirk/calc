@@ -14,9 +14,9 @@
 
 typedef enum NodeKind {
 	NODE_INVALID = 0,
-    NODE_NUMBER,
-    NODE_BINARY,
-    NODE_UNARY,
+	NODE_NUMBER,
+	NODE_BINARY,
+	NODE_UNARY,
 	NODE_VARIABLE,
 	NODE_UNKNOWN,
 	NODE_FUNCTIONCALL,
@@ -25,20 +25,20 @@ typedef enum NodeKind {
 
 typedef struct Node Node;
 struct Node {
-    NodeKind kind;
-    union {
-        struct {
-            double number;
-        } number;
-        struct {
-            char op;
-            Node *lhs;
-            Node *rhs;
-        } binary;
-        struct {
-            char op;
-            Node *expr;
-        } unary;
+	NodeKind kind;
+	union {
+		struct {
+			double number;
+		} number;
+		struct {
+			char op;
+			Node *lhs;
+			Node *rhs;
+		} binary;
+		struct {
+			char op;
+			Node *expr;
+		} unary;
 		struct {
 			char *name;
 		} variable;
@@ -47,7 +47,7 @@ struct Node {
 			Node **args;
 			int num_args;
 		} function_call;
-    };
+	};
 };
 
 typedef enum TokenKind {
@@ -78,51 +78,51 @@ typedef struct Calc {
 } Calc;
 
 typedef struct Args {
-    char *filename; // If we specify a file, do we want to read that until we reach the end, then switch to stdin or just exit?
-    bool  show_help;
+	char *filename; // If we specify a file, do we want to read that until we reach the end, then switch to stdin or just exit?
+	bool  show_help;
 } Args;
 
 void print_help() {
-    printf("calc [options] input\n");
-    printf("Default input is '-', stdin\n");
-    printf("\nOptions:\n");
-    printf("\t-h/help - Prints out this\n");
+	printf("calc [options] input\n");
+	printf("Default input is '-', stdin\n");
+	printf("\nOptions:\n");
+	printf("\t-h/help - Prints out this\n");
 }
 
 void parse_args(int argc, const char **argv, Args *args) {
-    if(argc < 2) {
-        return;
-    }
+	if(argc < 2) {
+		return;
+	}
 
-    for(int i = 1; i < argc; i++) {
-        char *arg = (char*) argv[i];
-        if(*arg == '-') {
-            char *name = arg+1;
-            if(name && *name) {
-                if(strcmp(name, "h") == 0 || strcmp(name, "help") == 0) {
-                    args->show_help = true;
-                } else {
-                    fprintf(stderr, "Unknown option '%s'\n", arg);
-                    print_help();
-                    exit(1);
-                }
-            } else {
-                if(args->filename) {
-                    fprintf(stderr, "Multiple filenames passed. Already got '%s', found '%s'", args->filename, arg);
-                    exit(1);
-                } else {
-                    args->filename = strdup(arg);
-                }
-            }
-        } else {
-            if(args->filename) {
-                fprintf(stderr, "Multiple filenames passed. Already got '%s', found '%s'", args->filename, arg);
-                exit(1);
-            } else {
-                args->filename = strdup(arg);
-            }
-        }
-    }
+	for(int i = 1; i < argc; i++) {
+		char *arg = (char*) argv[i];
+		if(*arg == '-') {
+			char *name = arg+1;
+			if(name && *name) {
+				if(strcmp(name, "h") == 0 || strcmp(name, "help") == 0) {
+					args->show_help = true;
+				} else {
+					fprintf(stderr, "Unknown option '%s'\n", arg);
+					print_help();
+					exit(1);
+				}
+			} else {
+				if(args->filename) {
+					fprintf(stderr, "Multiple filenames passed. Already got '%s', found '%s'", args->filename, arg);
+					exit(1);
+				} else {
+					args->filename = strdup(arg);
+				}
+			}
+		} else {
+			if(args->filename) {
+				fprintf(stderr, "Multiple filenames passed. Already got '%s', found '%s'", args->filename, arg);
+				exit(1);
+			} else {
+				args->filename = strdup(arg);
+			}
+		}
+	}
 }
 
 Node* new_node(NodeKind kind) {
@@ -435,13 +435,13 @@ bool eval_expr(Node *n, double *result) {
 }
 
 int main(int argc, const char **argv) {
-    Args args = {0};
-    parse_args(argc, argv, &args);
+	Args args = {0};
+	parse_args(argc, argv, &args);
 
-    if(args.show_help) {
-        print_help();
-        return 0;
-    }
+	if(args.show_help) {
+		print_help();
+		return 0;
+	}
 
 	Calc calc = {0};
 	if(args.filename) {
@@ -516,5 +516,5 @@ int main(int argc, const char **argv) {
 		printf("unknown: '%c'\n", t.unknown_char);
 	}*/
 
-    return 0;
+	return 0;
 }
