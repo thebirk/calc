@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <math.h>
 
+#define CALC_VERISON "v0.01"
+
 #ifdef _WIN32
 #   define strdup _strdup
 #endif /* _WIN32 */
@@ -218,6 +220,7 @@ Node* parse_operand(Calc *calc) {
 		}
 		return expr;
 	} else {
+		printf("Unexpected token: '%c'/%d\n", t.kind, t.kind);
 		return new_node(NODE_UNKNOWN);
 	}	
 }
@@ -424,14 +427,39 @@ bool eval_expr(Node *n, double *result) {
 
 			return true;
 		} break;
+		case NODE_EOF: {
+			return false;
+		} break;
+		case NODE_INVALID: {
+			return false;
+		} break;
+		case NODE_UNKNOWN: {
+			return false;
+		} break;
 
 		default: {
+			printf("n->kind: %d\n", n->kind);
 			assert(!"Missing case!");
 			return false;
 		} break;
 	}
 
 	assert(!"Nope");
+}
+
+void print_calc_help() {
+	printf("Operators:\n");
+	printf("  + - addition\n");
+	printf("  - - subtraction\n");
+	printf("  * - multiplication\n");
+	printf("  / - division\n");
+	printf("  %% - modulo\n");
+	printf("  ^ - exponentiation\n");
+
+	printf("\nCommands\n");
+	printf("  help      - show this message\n");
+	printf("  cls/clear - clear screen\n");
+	printf("  exit/q    - quit calc\n");
 }
 
 int main(int argc, const char **argv) {
@@ -456,7 +484,7 @@ int main(int argc, const char **argv) {
 		calc.input = stdin;
 	}
 
-	printf("calc v0.01\n");
+	printf("calc "CALC_VERISON"\n");
 	printf("Type 'exit' or 'q' to quit\n\n");
 
 	while(true) {
@@ -483,6 +511,9 @@ int main(int argc, const char **argv) {
 			#endif
 
 			continue;
+		} else if(strcmp(input, "help\n") == 0) {
+			print_calc_help();
+			continue;
 		}
 
 		next_token(&calc); // advance to first token
@@ -493,8 +524,6 @@ int main(int argc, const char **argv) {
 		bool ok = eval_expr(n, &result);
 		if(ok) {
 			printf("%g\n", result);
-		} else {
-			printf("err\n");
 		}
 		print_node(&indent, n);
 	}
