@@ -462,6 +462,38 @@ void print_calc_help() {
 	printf("  exit/q    - quit calc\n");
 }
 
+#ifdef _WIN32
+char* get_input(Calc *calc) {
+	char buffer[4096];
+	char *input = fgets(buffer, 4096, calc->input);
+	if(!input) {
+		// end of current input, switch to stdin for now
+		calc->input = stdin;
+		return get_input(calc);
+	}
+
+	char *result = strdup(input);
+	return result;	
+}
+
+void free_input(Calc *calc) {
+	free(calc->input);
+}
+
+#else
+
+#include "linenoise/linenoise.h"
+#include "linenoise/linenoise.c"
+char* get_input(Calc *calc) {
+	return linenoise("");
+}
+
+void free_input(Calc *calc) {
+	linenoiseFree(calc->input_text);
+}
+
+#endif /* _WIN32 vs. linenoise*/
+
 int main(int argc, const char **argv) {
 	Args args = {0};
 	parse_args(argc, argv, &args);
@@ -489,16 +521,10 @@ int main(int argc, const char **argv) {
 
 	while(true) {
 		printf("> ");
+		fflush(stdout);
 
-		after_prompt:;
-		char buffer[4096];
-		char *input = fgets(buffer, 4096, calc.input);
-		if(!input) {
-			// end of current input, switch to stdin for now
-			calc.input = stdin;
-			goto after_prompt;
-		}
-		
+		if(calc.input_text) free_input(&calc);
+		char *input = get_input(&calc);
 		calc.input_text = input;
 
 		if(strcmp(input, "exit\n") == 0 || strcmp(input, "q\n") == 0) {
