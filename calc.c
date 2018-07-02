@@ -77,6 +77,7 @@ typedef struct Calc {
 	int       num_variables;
 	Token     current_token;
 	char     *input_text;
+	char     *input_text_ptr;
 } Calc;
 
 typedef struct Args {
@@ -134,49 +135,49 @@ Node* new_node(NodeKind kind) {
 }
 
 Token get_token(Calc *calc) {
-	while(*calc->input_text) {
-		char c = *calc->input_text;
+	char c = *calc->input_text;
 
-		if(c == '\n') {
-			calc->input_text++;
-			return (Token){.kind = TOKEN_EOF};
-		}
-
-		if(c == '\r' || c == ' ' || c == '\t') {
-			calc->input_text++;
-			return get_token(calc);
-		}
-
-		switch(c) {
-			case '+': calc->input_text++; return (Token){.kind = '+'};
-			case '-': calc->input_text++; return (Token){.kind = '-'};
-			case '/': calc->input_text++; return (Token){.kind = '/'};
-			case '*': calc->input_text++; return (Token){.kind = '*'};
-			case '%': calc->input_text++; return (Token){.kind = '%'};
-			case '^': calc->input_text++; return (Token){.kind = '^'};
-			case '(': calc->input_text++; return (Token){.kind = '('};
-			case ')': calc->input_text++; return (Token){.kind = ')'};
-		}
-
-		if(isdigit(c)) {
-			char buffer[256];
-			int offset = 0;
-			while(isdigit(c)) {
-				buffer[offset++] = c;
-				calc->input_text++;
-				c = *calc->input_text;
-			}
-			buffer[offset++] = 0;
-
-			double num = strtod(buffer, 0);
-			return (Token){.kind = TOKEN_NUMBER, .number = num};
-		}
-
-		printf("Unknown: '%c'/%d\n", c, c);
-		return (Token){.kind = TOKEN_UNKNOWN, .unknown_char = c};
+	if(c == 0) {
+		return (Token){.kind = TOKEN_EOF};
 	}
 
-	return (Token){.kind = TOKEN_EOF};
+	if(c == '\n') {
+		calc->input_text++;
+		return (Token){.kind = TOKEN_EOF};
+	}
+
+	if(c == '\r' || c == ' ' || c == '\t') {
+		calc->input_text++;
+		return get_token(calc);
+	}
+
+	switch(c) {
+		case '+': calc->input_text++; return (Token){.kind = '+'};
+		case '-': calc->input_text++; return (Token){.kind = '-'};
+		case '/': calc->input_text++; return (Token){.kind = '/'};
+		case '*': calc->input_text++; return (Token){.kind = '*'};
+		case '%': calc->input_text++; return (Token){.kind = '%'};
+		case '^': calc->input_text++; return (Token){.kind = '^'};
+		case '(': calc->input_text++; return (Token){.kind = '('};
+		case ')': calc->input_text++; return (Token){.kind = ')'};
+	}
+
+	if(isdigit(c)) {
+		char buffer[256];
+		int offset = 0;
+		while(isdigit(c)) {
+			buffer[offset++] = c;
+			calc->input_text++;
+			c = *calc->input_text;
+		}
+		buffer[offset++] = 0;
+
+		double num = strtod(buffer, 0);
+		return (Token){.kind = TOKEN_NUMBER, .number = num};
+	}
+
+	printf("Unknown: '%c'/%d\n", c, c);
+	return (Token){.kind = TOKEN_UNKNOWN, .unknown_char = c};
 }
 
 Token next_token(Calc *calc) {
@@ -209,8 +210,10 @@ Node* parse_operand(Calc *calc) {
 		return n;
 	} else if(match_token(calc, TOKEN_UNKNOWN)) {
 		Node *n = new_node(NODE_UNKNOWN);
+		printf("Unknown token: '%c'/%d\n", t.kind, t.kind);
 		return n;
 	} else if(match_token(calc, TOKEN_EOF)) {
+		printf("Unexptected end of input\n");
 		return new_node(NODE_EOF);
 	} else if(match_token(calc, '(')) {
 		Node *expr = parse_expr(calc);
@@ -462,7 +465,7 @@ void print_calc_help() {
 	printf("  exit/q    - quit calc\n");
 }
 
-#ifdef _WIN32
+#if 1
 char* get_input(Calc *calc) {
 	char buffer[4096];
 	char *input = fgets(buffer, 4096, calc->input);
@@ -472,12 +475,14 @@ char* get_input(Calc *calc) {
 		return get_input(calc);
 	}
 
+	//TODO: Strip newline from end, if there is one
+
 	char *result = strdup(input);
 	return result;	
 }
 
 void free_input(Calc *calc) {
-	free(calc->input);
+	free(calc->input_text_ptr);
 }
 
 #else
@@ -521,11 +526,11 @@ int main(int argc, const char **argv) {
 
 	while(true) {
 		printf("> ");
-		fflush(stdout);
+		//fflush(stdout);
 
 		if(calc.input_text) free_input(&calc);
 		char *input = get_input(&calc);
-		calc.input_text = input;
+		calc.input_text_ptr = calc.input_text = input;
 
 		if(strcmp(input, "exit\n") == 0 || strcmp(input, "q\n") == 0) {
 			break;
@@ -551,7 +556,7 @@ int main(int argc, const char **argv) {
 		if(ok) {
 			printf("%g\n", result);
 		}
-		print_node(&indent, n);
+		//print_node(&indent, n);
 	}
 
 	/*
