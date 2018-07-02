@@ -56,6 +56,7 @@ typedef enum TokenKind {
 	TOKEN_NUMBER = 128,
 	TOKEN_EOF,
 	TOKEN_UNKNOWN,
+	TOKEN_NAME,
 } TokenKind;
 
 typedef struct Token {
@@ -63,6 +64,7 @@ typedef struct Token {
 	union {
 		double number;
 		char unknown_char;
+		char *name;
 	};
 } Token;
 
@@ -86,7 +88,7 @@ typedef struct Args {
 } Args;
 
 void print_help() {
-	printf("calc [options] input\n");
+	printf("calc [options or input]\n");
 	printf("Default input is '-', stdin\n");
 	printf("\nOptions:\n");
 	printf("\t-h/help - Prints out this\n");
@@ -175,6 +177,20 @@ Token get_token(Calc *calc) {
 		double num = strtod(buffer, 0);
 		return (Token){.kind = TOKEN_NUMBER, .number = num};
 	}
+	
+	if(isalpha(c) || c == '$' || c == '_' || c == '#') {
+		char buffer[256];
+		int offset = 0;
+		while(isalnum(c) || c == '$' || c == '_' || c == '#') {
+			buffer[offset++] = c;
+			calc->input_text++;
+			c = *calc->input_text;
+		}
+		buffer[offset++] = 0;
+
+		char *name = strdup(buffer); //TODO: Fix leak
+		return (Token){.kind = TOKEN_NAME, .name = name};
+	}
 
 	printf("Unknown: '%c'/%d\n", c, c);
 	return (Token){.kind = TOKEN_UNKNOWN, .unknown_char = c};
@@ -207,6 +223,10 @@ Node* parse_operand(Calc *calc) {
 	if(match_token(calc, TOKEN_NUMBER)) {
 		Node *n = new_node(NODE_NUMBER);
 		n->number.number = t.number;
+		return n;
+	} else if(match_token(calc, TOKEN_NAME)) {
+		Node *n = new_node(NODE_VARIABLE);
+		n->variable.name = t.name; //TODO: To we need  to copy the name here, or is it safe to assume that we own it?
 		return n;
 	} else if(match_token(calc, TOKEN_UNKNOWN)) {
 		Node *n = new_node(NODE_UNKNOWN);
@@ -393,7 +413,27 @@ double binary_op(int op, double lhs, double rhs) {
 	}
 }
 
-bool eval_expr(Node *n, double *result) {
+Variable* get_variable(Calc *calc, char *name) {
+	for(int i = 0; i < calc->num_variables; i++) {
+		if(strcmp(name, calc->variables[i].name) == 0) {
+			return &calc->variables[i];
+		}
+	}
+	return 0;
+}
+
+bool add_variable(Calc *calc, char *name, double value) {
+	if(get_variable(calc, name) != 0) {
+		return false;
+	}
+
+	calc->num_variables++;
+	calc->variables = realloc(calc->variables, sizeof(Variable)*calc->num_variables);
+	calc->variables[calc->num_variables-1] = (Variable){.name = name, .value = value};
+	return true;
+}
+
+bool eval_expr(Calc *calc, Node *n, double *result) {
 	assert(result);
 
 	switch(n->kind) {
@@ -404,9 +444,9 @@ bool eval_expr(Node *n, double *result) {
 		case NODE_BINARY: {
 			double lhs, rhs;
 			bool ok = false;
-			ok = eval_expr(n->binary.lhs, &lhs);
+			ok = eval_expr(calc, n->binary.lhs, &lhs);
 			if(!ok) return false;
-			ok = eval_expr(n->binary.rhs, &rhs);
+			ok = eval_expr(calc, n->binary.rhs, &rhs);
 			if(!ok) return false;
 
 			*result = binary_op(n->binary.op, lhs, rhs);
@@ -415,7 +455,7 @@ bool eval_expr(Node *n, double *result) {
 		} break;
 		case NODE_UNARY: {
 			double rhs;
-			bool ok = eval_expr(n->unary.expr, &rhs);
+			bool ok = eval_expr(calc, n->unary.expr, &rhs);
 			if(!ok) return false;
 
 			switch(n->unary.op) {
@@ -438,6 +478,16 @@ bool eval_expr(Node *n, double *result) {
 		} break;
 		case NODE_UNKNOWN: {
 			return false;
+		} break;
+		case NODE_VARIABLE: {
+			Variable *v = get_variable(calc, n->variable.name);
+			if(v) {
+				*result = v->value;
+				return true;
+			} else {
+				printf("unknown variable '%s'\n", n->variable.name);
+				return false;
+			}
 		} break;
 
 		default: {
@@ -524,6 +574,8 @@ int main(int argc, const char **argv) {
 	printf("calc "CALC_VERISON"\n");
 	printf("Type 'exit' or 'q' to quit\n\n");
 
+	int R = 0;
+
 	while(true) {
 		printf("> ");
 		//fflush(stdout);
@@ -552,9 +604,17 @@ int main(int argc, const char **argv) {
 		int indent = 0;
 		
 		double result = 0;
-		bool ok = eval_expr(n, &result);
+		bool ok = eval_expr(&calc, n, &result);
 		if(ok) {
-			printf("%g\n", result);
+			R++;
+
+			printf("#%d: %g\n", R, result);
+			char buffer[256];
+			snprintf(buffer, 256, "#%d", R);
+			char *name = strdup(buffer);
+			if(!add_variable(&calc, name, result)) {
+				printf("Failed to add variable '%s'\n", name);
+			}
 		}
 		//print_node(&indent, n);
 	}

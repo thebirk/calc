@@ -1,2 +1,2 @@
 @echo off
-cl /nologo calc.c /Fe:calc.exe
+cl /nologo /Z7 /Od calc.c /Fe:calc.exe
