@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <math.h>
 
 #ifdef _WIN32
 #   define strdup _strdup
@@ -259,13 +260,31 @@ Node* parse_unary(Calc *calc) {
 	return rhs;
 }
 
-Node* parse_mul(Calc *calc) {
+Node* parse_pow(Calc *calc) {
 	Node *lhs = parse_unary(calc);
+
+	while(is_token(calc, '^')) {
+		Token op = calc->current_token;
+		next_token(calc);
+		Node *rhs = parse_unary(calc);
+
+		Node *bin = new_node(NODE_BINARY);
+		bin->binary.op = op.kind;
+		bin->binary.lhs = lhs;
+		bin->binary.rhs = rhs;
+		lhs = bin;
+	}
+
+	return lhs;
+}
+
+Node* parse_mul(Calc *calc) {
+	Node *lhs = parse_pow(calc);
 
 	while(is_token(calc, '*') || is_token(calc, '/') || is_token(calc, '%')) {
 		Token op = calc->current_token;
 		next_token(calc);
-		Node *rhs = parse_unary(calc);
+		Node *rhs = parse_pow(calc);
 
 		Node *bin = new_node(NODE_BINARY);
 		bin->binary.op = op.kind;
@@ -352,6 +371,69 @@ void print_node(int *i, Node *n) {
 	}
 }
 
+double binary_op(int op, double lhs, double rhs) {
+	switch(op) {
+		case '+': return lhs + rhs;
+		case '-': return lhs - rhs;
+		case '*': return lhs * rhs;
+		case '/': return lhs / rhs;
+		case '%': return fmod(lhs, rhs);
+		case '^': return pow(lhs, rhs);
+
+		default: {
+			assert(!"Invalid case");
+			return 12345678.0;
+		}
+	}
+}
+
+bool eval_expr(Node *n, double *result) {
+	assert(result);
+
+	switch(n->kind) {
+		case NODE_NUMBER: {
+			*result = n->number.number;
+			return true;
+		} break;
+		case NODE_BINARY: {
+			double lhs, rhs;
+			bool ok = false;
+			ok = eval_expr(n->binary.lhs, &lhs);
+			if(!ok) return false;
+			ok = eval_expr(n->binary.rhs, &rhs);
+			if(!ok) return false;
+
+			*result = binary_op(n->binary.op, lhs, rhs);
+
+			return true;
+		} break;
+		case NODE_UNARY: {
+			double rhs;
+			bool ok = eval_expr(n->unary.expr, &rhs);
+			if(!ok) return false;
+
+			switch(n->unary.op) {
+				case '+': *result = +rhs; break;// Do we really need this?
+				case '-': *result = -rhs; break;
+
+				default: {
+					assert(!"Invalid unary op");
+					return false;
+				}
+			}
+
+			return true;
+		} break;
+
+		default: {
+			assert(!"Missing case!");
+			return false;
+		} break;
+	}
+
+	assert(!"Nope");
+}
+
 int main(int argc, const char **argv) {
     Args args = {0};
     parse_args(argc, argv, &args);
@@ -406,6 +488,14 @@ int main(int argc, const char **argv) {
 		next_token(&calc); // advance to first token
 		Node *n = parse_expr(&calc);
 		int indent = 0;
+		
+		double result = 0;
+		bool ok = eval_expr(n, &result);
+		if(ok) {
+			printf("%g\n", result);
+		} else {
+			printf("err\n");
+		}
 		print_node(&indent, n);
 	}
 
