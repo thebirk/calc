@@ -507,7 +507,7 @@ bool eval_expr(Calc *calc, Node *n, double *result) {
 			if(!ok) return false;
 
 			switch(n->unary.op) {
-				case '+': *result = +rhs; break;// Do we really need this?
+				case '+': *result = +rhs; break; // Do we really need this?
 				case '-': *result = -rhs; break;
 
 				default: {
@@ -571,28 +571,11 @@ void free_node(Node *n) {
 	free(n);
 }
 
-void print_calc_help() {
-	printf("Operators:\n");
-	printf("  + - addition\n");
-	printf("  - - subtraction\n");
-	printf("  * - multiplication\n");
-	printf("  / - division\n");
-	printf("  %% - modulo\n");
-	printf("  ^ - exponentiation\n");
-
-	printf("\nCommands\n");
-	printf("  help      - show this message\n");
-	printf("  cls/clear - clear screen\n");
-	printf("  clc       - clear memory\n");
-	printf("  exit/q    - quit calc\n");
-}
-
 #if 1
 char* get_input(Calc *calc) {
 	char buffer[4096];
 	char *input = fgets(buffer, 4096, calc->input);
 	if(!input) {
-		// end of current input, switch to stdin for now
 		calc->input = stdin;
 		return get_input(calc);
 	}
@@ -609,6 +592,7 @@ void free_input(Calc *calc) {
 
 #else
 
+//TODO: Find out what lib to use for non windows input
 #include "linenoise/linenoise.h"
 #include "linenoise/linenoise.c"
 char* get_input(Calc *calc) {
@@ -620,6 +604,22 @@ void free_input(Calc *calc) {
 }
 
 #endif /* _WIN32 vs. linenoise*/
+
+void print_calc_help() {
+	printf("Operators:\n");
+	printf("  + - addition\n");
+	printf("  - - subtraction\n");
+	printf("  * - multiplication\n");
+	printf("  / - division\n");
+	printf("  %% - modulo\n");
+	printf("  ^ - exponentiation\n");
+
+	printf("\nCommands\n");
+	printf("  help      - show this message\n");
+	printf("  cls/clear - clear screen\n");
+	printf("  clc       - clear memory\n");
+	printf("  exit/q    - quit calc\n");
+}
 
 int main(int argc, const char **argv) {
 	Args args = {0};
@@ -635,7 +635,6 @@ int main(int argc, const char **argv) {
 		if(strcmp(args.filename, "-") == 0) {
 			calc.input = stdin;
 		} else {
-			//NOTE: I think it's better to use just "r" here and not "rb" as we dont really care about bytes, or line endings. We just want characters.
 			calc.input = fopen(args.filename, "r");
 
 		}
@@ -650,7 +649,7 @@ int main(int argc, const char **argv) {
 
 	while(true) {
 		printf("> ");
-		//fflush(stdout);
+		fflush(stdout);
 
 		if(calc.input_text) free_input(&calc);
 		char *input = get_input(&calc);
@@ -680,17 +679,26 @@ int main(int argc, const char **argv) {
 			continue;
 		}
 
-		next_token(&calc); // advance to first token
+		next_token(&calc);
 		Node *n = parse_expr(&calc);
-		//TODO: Assert that the current token is EOF or similar as currently this "1r" parses as "1" and not syntax error.
-		int indent = 0;
+		if(calc.current_token.kind != TOKEN_EOF) {
+			printf("expression error\n");
+			continue;
+		}
 		
 		double result = 0;
 		bool ok = eval_expr(&calc, n, &result);
 		if(ok) {
 			R++;
 
-			//TODO: Add a variable that always refers to the last result
+			Variable *rvar = get_variable(&calc, "#");
+			if(!rvar) {
+				if(!add_variable(&calc, "#", result)) {
+					printf("Failed to add variable '%s'\n", "#");
+				}
+			} else {
+				rvar->value = result;
+			}
 
 			printf("#%d: %f\n", R, result);
 			char buffer[256];
@@ -700,6 +708,8 @@ int main(int argc, const char **argv) {
 				printf("Failed to add variable '%s'\n", name);
 			}
 		}
+
+		//int indent = 0;		
 		//print_node(&indent, n);
 
 		free_node(n);
