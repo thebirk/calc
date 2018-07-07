@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
 
 #define CALC_VERISON "v0.01"
+const int CALC_BUILD =
+#include "bnum.txt"
+;
 
 #ifdef _WIN32
 #   define strdup _strdup
@@ -15,14 +19,14 @@
 #define new(T) ((T*) calloc(1, sizeof(T)))
 
 typedef enum NodeKind {
-	NODE_INVALID = 0,
-	NODE_NUMBER,
-	NODE_BINARY,
-	NODE_UNARY,
-	NODE_VARIABLE,
-	NODE_UNKNOWN,
-	NODE_FUNCTIONCALL,
-	NODE_EOF,
+	NodeInvalid = 0,
+	NodeNumber,
+	NodeBinary,
+	NodeUnary,
+	NodeVariable,
+	NodeUnknown,
+	NodeFunctioncall,
+	NodeEof,
 } NodeKind;
 
 typedef struct Node Node;
@@ -130,7 +134,8 @@ void parse_args(int argc, const char **argv, Args *args) {
 	}
 }
 
-Node* new_node(NodeKind kind) {
+#define new_node(T) (_new_node(Node ## T))
+Node* _new_node(NodeKind kind) {
 	Node *n = new(Node);
 	n->kind = kind;
 	return n;
@@ -162,6 +167,7 @@ Token get_token(Calc *calc) {
 		case '^': calc->input_text++; return (Token){.kind = '^'};
 		case '(': calc->input_text++; return (Token){.kind = '('};
 		case ')': calc->input_text++; return (Token){.kind = ')'};
+		case '=': calc->input_text++; return (Token){.kind = '='};
 	}
 
 	if(isdigit(c)) {
@@ -221,20 +227,20 @@ Node* parse_operand(Calc *calc) {
 	Token t = calc->current_token;
 
 	if(match_token(calc, TOKEN_NUMBER)) {
-		Node *n = new_node(NODE_NUMBER);
+		Node *n = new_node(Number);
 		n->number.number = t.number;
 		return n;
 	} else if(match_token(calc, TOKEN_NAME)) {
-		Node *n = new_node(NODE_VARIABLE);
+		Node *n = new_node(Variable);
 		n->variable.name = t.name; //TODO: To we need  to copy the name here, or is it safe to assume that we own it?
 		return n;
 	} else if(match_token(calc, TOKEN_UNKNOWN)) {
-		Node *n = new_node(NODE_UNKNOWN);
+		Node *n = new_node(Unknown);
 		printf("Unknown token: '%c'/%d\n", t.kind, t.kind);
 		return n;
 	} else if(match_token(calc, TOKEN_EOF)) {
 		printf("Unexptected end of input\n");
-		return new_node(NODE_EOF);
+		return new_node(Eof);
 	} else if(match_token(calc, '(')) {
 		Node *expr = parse_expr(calc);
 		if(!match_token(calc, ')')){
@@ -244,7 +250,7 @@ Node* parse_operand(Calc *calc) {
 		return expr;
 	} else {
 		printf("Unexpected token: '%c'/%d\n", t.kind, t.kind);
-		return new_node(NODE_UNKNOWN);
+		return new_node(Unknown);
 	}	
 }
 
@@ -277,7 +283,7 @@ Node* parse_unary(Calc *calc) {
 	Node *rhs = parse_base(calc);
 	
 	if(is_unary) {
-		Node *unary = new_node(NODE_UNARY);
+		Node *unary = new_node(Unary);
 		unary->unary.op = unary_op;
 		unary->unary.expr = rhs;
 		rhs = unary;
@@ -294,7 +300,7 @@ Node* parse_pow(Calc *calc) {
 		next_token(calc);
 		Node *rhs = parse_unary(calc);
 
-		Node *bin = new_node(NODE_BINARY);
+		Node *bin = new_node(Binary);
 		bin->binary.op = op.kind;
 		bin->binary.lhs = lhs;
 		bin->binary.rhs = rhs;
@@ -312,7 +318,7 @@ Node* parse_mul(Calc *calc) {
 		next_token(calc);
 		Node *rhs = parse_pow(calc);
 
-		Node *bin = new_node(NODE_BINARY);
+		Node *bin = new_node(Binary);
 		bin->binary.op = op.kind;
 		bin->binary.lhs = lhs;
 		bin->binary.rhs = rhs;
@@ -330,7 +336,25 @@ Node* parse_plus(Calc *calc) {
 		next_token(calc);
 		Node *rhs = parse_mul(calc);
 
-		Node *bin = new_node(NODE_BINARY);
+		Node *bin = new_node(Binary);
+		bin->binary.op = op.kind;
+		bin->binary.lhs = lhs;
+		bin->binary.rhs = rhs;
+		lhs = bin;
+	}
+
+	return lhs;
+}
+
+Node* parse_assign(Calc *calc) {
+	Node *lhs = parse_plus(calc);
+
+	if(is_token(calc, '=')) {
+		Token op = calc->current_token;
+		next_token(calc);
+		Node *rhs = parse_mul(calc);
+
+		Node *bin = new_node(Binary);
 		bin->binary.op = op.kind;
 		bin->binary.lhs = lhs;
 		bin->binary.rhs = rhs;
@@ -341,17 +365,7 @@ Node* parse_plus(Calc *calc) {
 }
 
 Node* parse_expr(Calc *calc) {
-	return parse_plus(calc);
-}
-
-Node* parse(Calc *calc) {
-	// check for unary
-	// parse term
-	// while op do term
-	// apply unary
-
-	// when executing the node, if the node is a binary and the op is '=' assert that the lhs is a variable and assign the rhs to it
-	return new(Node);
+	return parse_assign(calc);
 }
 
 void indent(int *indent) {
@@ -363,11 +377,11 @@ void indent(int *indent) {
 
 void print_node(int *i, Node *n) {
 	switch(n->kind) {
-		case NODE_NUMBER: {
+		case NodeNumber: {
 			indent(i);
 			printf("NUMBER: %f\n", n->number.number);
 		} break;
-		case NODE_BINARY: {
+		case NodeBinary: {
 			indent(i);
 			printf("BINARY: '%c'\n", n->binary.op);
 			(*i)++;
@@ -384,7 +398,7 @@ void print_node(int *i, Node *n) {
 			(*i)--;
 			(*i)--;
 		} break;
-		case NODE_UNARY: {
+		case NodeUnary: {
 			indent(i);
 			printf("UNARY: '%c'\n", n->unary.op);
 			(*i)++;
@@ -414,6 +428,7 @@ double binary_op(int op, double lhs, double rhs) {
 }
 
 Variable* get_variable(Calc *calc, char *name) {
+	if(calc->num_variables == 0) return 0;
 	for(int i = 0; i < calc->num_variables; i++) {
 		if(strcmp(name, calc->variables[i].name) == 0) {
 			return &calc->variables[i];
@@ -429,7 +444,7 @@ bool add_variable(Calc *calc, char *name, double value) {
 
 	calc->num_variables++;
 	calc->variables = realloc(calc->variables, sizeof(Variable)*calc->num_variables);
-	calc->variables[calc->num_variables-1] = (Variable){.name = name, .value = value};
+	calc->variables[calc->num_variables-1] = (Variable){.name = strdup(name), .value = value};
 	return true;
 }
 
@@ -437,23 +452,56 @@ bool eval_expr(Calc *calc, Node *n, double *result) {
 	assert(result);
 
 	switch(n->kind) {
-		case NODE_NUMBER: {
+		case NodeNumber: {
 			*result = n->number.number;
 			return true;
 		} break;
-		case NODE_BINARY: {
+		case NodeBinary: {
 			double lhs, rhs;
-			bool ok = false;
-			ok = eval_expr(calc, n->binary.lhs, &lhs);
-			if(!ok) return false;
-			ok = eval_expr(calc, n->binary.rhs, &rhs);
-			if(!ok) return false;
 
-			*result = binary_op(n->binary.op, lhs, rhs);
+			if(n->binary.op == '=') {
+				if(n->binary.lhs->kind != NodeVariable) {
+					printf("cannot assign to left hand side of expression\n");
+					return false;
+				}
 
-			return true;
+				double res = 0;
+				bool ok = eval_expr(calc, n->binary.rhs, &res);
+				if(!ok) return false;
+
+				if(n->binary.lhs->variable.name && *n->binary.lhs->variable.name == '#') {
+					printf("reserved variable name\n");
+					return false;
+				}
+
+				Variable *v = get_variable(calc, n->binary.lhs->variable.name);
+				if(!v) {
+					ok = add_variable(calc, n->binary.lhs->variable.name, res);
+					if(!ok) {
+						printf("failed to add variable '%s'\n", n->binary.lhs->variable.name);
+						return false;
+					}
+
+					*result = res;
+					return true;
+				}
+				v->value = res;
+
+				*result = res;
+				return true;
+			} else {
+				bool ok = false;
+				ok = eval_expr(calc, n->binary.lhs, &lhs);
+				if(!ok) return false;
+				ok = eval_expr(calc, n->binary.rhs, &rhs);
+				if(!ok) return false;
+
+				*result = binary_op(n->binary.op, lhs, rhs);
+
+				return true;
+			}
 		} break;
-		case NODE_UNARY: {
+		case NodeUnary: {
 			double rhs;
 			bool ok = eval_expr(calc, n->unary.expr, &rhs);
 			if(!ok) return false;
@@ -470,16 +518,19 @@ bool eval_expr(Calc *calc, Node *n, double *result) {
 
 			return true;
 		} break;
-		case NODE_EOF: {
+		case NodeEof: {
+			printf("expression error\n");
 			return false;
 		} break;
-		case NODE_INVALID: {
+		case NodeInvalid: {
+			printf("expression error\n");
 			return false;
 		} break;
-		case NODE_UNKNOWN: {
+		case NodeUnknown: {
+			printf("expression error\n");
 			return false;
 		} break;
-		case NODE_VARIABLE: {
+		case NodeVariable: {
 			Variable *v = get_variable(calc, n->variable.name);
 			if(v) {
 				*result = v->value;
@@ -500,6 +551,26 @@ bool eval_expr(Calc *calc, Node *n, double *result) {
 	assert(!"Nope");
 }
 
+void free_node(Node *n) {
+	switch(n->kind) {
+		case NodeBinary: {
+			free_node(n->binary.lhs);
+			free_node(n->binary.rhs);
+		} break;
+		case NodeVariable: {
+			free(n->variable.name);
+		} break;
+		case NodeUnary: {
+			free_node(n->unary.expr);
+		} break;
+		case NodeFunctioncall: {
+			assert(!"Incomplete!");
+		} break;
+	}
+
+	free(n);
+}
+
 void print_calc_help() {
 	printf("Operators:\n");
 	printf("  + - addition\n");
@@ -512,6 +583,7 @@ void print_calc_help() {
 	printf("\nCommands\n");
 	printf("  help      - show this message\n");
 	printf("  cls/clear - clear screen\n");
+	printf("  clc       - clear memory\n");
 	printf("  exit/q    - quit calc\n");
 }
 
@@ -571,8 +643,8 @@ int main(int argc, const char **argv) {
 		calc.input = stdin;
 	}
 
-	printf("calc "CALC_VERISON"\n");
-	printf("Type 'exit' or 'q' to quit\n\n");
+	printf("calc "CALC_VERISON" build %d\n", CALC_BUILD);
+	printf("Type 'exit' or 'q' to quit, and 'help' for help\n\n");
 
 	int R = 0;
 
@@ -597,6 +669,15 @@ int main(int argc, const char **argv) {
 		} else if(strcmp(input, "help\n") == 0) {
 			print_calc_help();
 			continue;
+		} else if(strcmp(input, "clc\n") == 0) {
+			for(int i = 0; i < calc.num_variables; i++) {
+				free(calc.variables[i].name);
+			}
+			free(calc.variables);
+			calc.num_variables = 0;
+			calc.variables = 0;
+			R=0;
+			continue;
 		}
 
 		next_token(&calc); // advance to first token
@@ -611,7 +692,7 @@ int main(int argc, const char **argv) {
 
 			//TODO: Add a variable that always refers to the last result
 
-			printf("#%d: %g\n", R, result);
+			printf("#%d: %f\n", R, result);
 			char buffer[256];
 			snprintf(buffer, 256, "#%d", R);
 			char *name = strdup(buffer);
@@ -620,24 +701,9 @@ int main(int argc, const char **argv) {
 			}
 		}
 		//print_node(&indent, n);
+
+		free_node(n);
 	}
-
-	/*
-	printf("> ");
-	next_token(&calc);
-	parse_operand(&calc);
-	*/
-
-	/*Token t = get_token(&calc);
-	if(t.kind < 128) {
-		printf("t.kind: '%c'/%d\n", t.kind, t.kind);
-	} else if(t.kind == TOKEN_NUMBER) {
-		printf("number: %f\n", t.number);
-	} else if(t.kind == TOKEN_EOF) {
-		printf("eof\n");
-	} else if(t.kind ==TOKEN_UNKNOWN) {
-		printf("unknown: '%c'\n", t.unknown_char);
-	}*/
 
 	return 0;
 }
