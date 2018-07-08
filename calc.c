@@ -7,6 +7,17 @@
 #include <ctype.h>
 #include <math.h>
 
+/*
+TODO:
+	- Lex numbers properly, allow for decimals, hexadecimals, binary and scientific
+	- Add function call
+	- Add all kinds of common math function
+
+PERHAPS TODOS:
+	- User functions f(x) := x * x
+	- Redo last expr, probably not needed when we get history on non-windows systems
+*/
+
 #define CALC_VERISON "v0.01"
 #include "CALC_BUILD.h"
 
@@ -55,10 +66,10 @@ struct Node {
 };
 
 typedef enum TokenKind {
-	TOKEN_NUMBER = 128,
-	TOKEN_EOF,
-	TOKEN_UNKNOWN,
-	TOKEN_NAME,
+	TokenNumber = 128,
+	TokenEof,
+	TokenUnknown,
+	TokenName,
 } TokenKind;
 
 typedef struct Token {
@@ -143,12 +154,12 @@ Token get_token(Calc *calc) {
 	char c = *calc->input_text;
 
 	if(c == 0) {
-		return (Token){.kind = TOKEN_EOF};
+		return (Token){.kind = TokenEof};
 	}
 
 	if(c == '\n') {
 		calc->input_text++;
-		return (Token){.kind = TOKEN_EOF};
+		return (Token){.kind = TokenEof};
 	}
 
 	if(c == '\r' || c == ' ' || c == '\t') {
@@ -179,7 +190,7 @@ Token get_token(Calc *calc) {
 		buffer[offset++] = 0;
 
 		double num = strtod(buffer, 0);
-		return (Token){.kind = TOKEN_NUMBER, .number = num};
+		return (Token){.kind = TokenNumber, .number = num};
 	}
 	
 	if(isalpha(c) || c == '$' || c == '_' || c == '#') {
@@ -193,11 +204,11 @@ Token get_token(Calc *calc) {
 		buffer[offset++] = 0;
 
 		char *name = strdup(buffer); //TODO: Fix leak
-		return (Token){.kind = TOKEN_NAME, .name = name};
+		return (Token){.kind = TokenName, .name = name};
 	}
 
 	printf("Unknown: '%c'/%d\n", c, c);
-	return (Token){.kind = TOKEN_UNKNOWN, .unknown_char = c};
+	return (Token){.kind = TokenUnknown, .unknown_char = c};
 }
 
 Token next_token(Calc *calc) {
@@ -224,19 +235,19 @@ Node* parse_expr(Calc *calc);
 Node* parse_operand(Calc *calc) {
 	Token t = calc->current_token;
 
-	if(match_token(calc, TOKEN_NUMBER)) {
+	if(match_token(calc, TokenNumber)) {
 		Node *n = new_node(Number);
 		n->number.number = t.number;
 		return n;
-	} else if(match_token(calc, TOKEN_NAME)) {
+	} else if(match_token(calc, TokenName)) {
 		Node *n = new_node(Variable);
 		n->variable.name = t.name; //TODO: To we need  to copy the name here, or is it safe to assume that we own it?
 		return n;
-	} else if(match_token(calc, TOKEN_UNKNOWN)) {
+	} else if(match_token(calc, TokenUnknown)) {
 		Node *n = new_node(Unknown);
 		printf("Unknown token: '%c'/%d\n", t.kind, t.kind);
 		return n;
-	} else if(match_token(calc, TOKEN_EOF)) {
+	} else if(match_token(calc, TokenEof)) {
 		printf("Unexptected end of input\n");
 		return new_node(Eof);
 	} else if(match_token(calc, '(')) {
@@ -350,7 +361,7 @@ Node* parse_assign(Calc *calc) {
 	if(is_token(calc, '=')) {
 		Token op = calc->current_token;
 		next_token(calc);
-		Node *rhs = parse_mul(calc);
+		Node *rhs = parse_plus(calc);
 
 		Node *bin = new_node(Binary);
 		bin->binary.op = op.kind;
@@ -679,7 +690,7 @@ int main(int argc, const char **argv) {
 
 		next_token(&calc);
 		Node *n = parse_expr(&calc);
-		if(calc.current_token.kind != TOKEN_EOF) {
+		if(calc.current_token.kind != TokenEof) {
 			printf("expression error\n");
 			continue;
 		}
