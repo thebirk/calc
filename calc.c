@@ -8,9 +8,7 @@
 #include <math.h>
 
 #define CALC_VERISON "v0.01"
-const int CALC_BUILD =
-#include "bnum.txt"
-;
+#include "CALC_BUILD.h"
 
 #ifdef _WIN32
 #   define strdup _strdup
@@ -642,7 +640,7 @@ int main(int argc, const char **argv) {
 		calc.input = stdin;
 	}
 
-	printf("calc "CALC_VERISON" build %d\n", CALC_BUILD);
+	printf("calc "CALC_VERISON" build "CALC_BUILD"\n");
 	printf("Type 'exit' or 'q' to quit, and 'help' for help\n\n");
 
 	int R = 0;
