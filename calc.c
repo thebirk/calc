@@ -8,6 +8,9 @@
 #include <math.h>
 
 /*
+
+v0.02 - Added support for decimal point
+
 TODO:
 	- Lex numbers properly, allow for decimals, hexadecimals, binary and scientific
 	- Add function call
@@ -18,7 +21,7 @@ PERHAPS TODOS:
 	- Redo last expr, probably not needed when we get history on non-windows systems
 */
 
-#define CALC_VERISON "v0.01"
+#define CALC_VERISON "v0.02"
 #include "CALC_BUILD.h"
 
 #ifdef _WIN32
@@ -182,7 +185,13 @@ Token get_token(Calc *calc) {
 	if(isdigit(c)) {
 		char buffer[256];
 		int offset = 0;
-		while(isdigit(c)) {
+		bool found_dot = false;
+
+		while(isdigit(c) || c == '.') {
+			if(c == '.') {
+				if(found_dot) break;
+				found_dot = true;
+			}
 			buffer[offset++] = c;
 			calc->input_text++;
 			c = *calc->input_text;
@@ -270,7 +279,7 @@ Node* parse_base(Calc *calc) {
 		Token op = calc->current_token;
 
 		if(match_token(calc, '(')) {
-
+			assert(!"Incomplete!");
 		} else {
 			assert(!"Invalid case");
 		}
